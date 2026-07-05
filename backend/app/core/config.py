@@ -1,6 +1,7 @@
 import os
 # Set HF_HOME cache directory to D: drive due to low space on C: drive (only ~16MB free)
-os.environ["HF_HOME"] = "D:\\huggingface_cache"
+if "HF_HOME" not in os.environ:
+    os.environ["HF_HOME"] = "D:\\huggingface_cache"
 os.environ["KMP_DUPLICATE_LIB_OK"] = "TRUE"
 os.environ["OMP_NUM_THREADS"] = "1"
 os.environ["MKL_NUM_THREADS"] = "1"

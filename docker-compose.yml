@@ -1,0 +1,57 @@
+services:
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: rag-backend
+    ports:
+      - "8000:8000"
+    environment:
+      - MONGO_URI=mongodb://mongodb:27017/
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - SQLITE_DB_PATH=/app/data/hybrid_rag.db
+    env_file:
+      - ./backend/app/.env
+    volumes:
+      - backend_uploads:/app/uploads
+      - backend_faiss:/app/faiss_index
+      - huggingface_cache:/app/huggingface_cache
+      - backend_db:/app/data
+    depends_on:
+      - mongodb
+      - redis
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: rag-frontend
+    ports:
+      - "5500:80"
+    depends_on:
+      - backend
+
+  mongodb:
+    image: mongo:6.0
+    container_name: rag-mongodb
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongodb_data:/data/db
+
+  redis:
+    image: redis:7.0-alpine
+    container_name: rag-redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+
+volumes:
+  backend_uploads:
+  backend_faiss:
+  huggingface_cache:
+  backend_db:
+  mongodb_data:
+  redis_data:

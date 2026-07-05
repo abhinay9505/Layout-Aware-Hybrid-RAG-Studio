@@ -8,7 +8,8 @@ from app.core.config import MONGO_DB
 
 # Use an absolute path for hybrid_rag.db so both run.py/FastAPI and reindex.py use the same file.
 BACKEND_DIR = Path(__file__).resolve().parent.parent.parent
-DB_FILE = str(BACKEND_DIR / f"{MONGO_DB}.db")
+import os
+DB_FILE = os.getenv("SQLITE_DB_PATH", str(BACKEND_DIR / f"{MONGO_DB}.db"))
 
 # Thread-safe lock for SQLite operations in async context
 _db_lock = asyncio.Lock()
@@ -17,6 +18,9 @@ _use_mongo = False
 _mongo_db = None
 
 def init_sqlite_db():
+    db_dir = os.path.dirname(DB_FILE)
+    if db_dir:
+        os.makedirs(db_dir, exist_ok=True)
     conn = sqlite3.connect(DB_FILE)
     try:
         cursor = conn.cursor()
