@@ -1,65 +1,84 @@
-from fastapi import APIRouter, UploadFile, File, Depends, HTTPException, status
+import uuid
+from fastapi import APIRouter, UploadFile, File, HTTPException, status, Depends
 from app.models.schemas import ChatRequest, ChatResponse, UserRegister, UserLogin, Token
 from app.services.ingestion import UploadService
 from app.services.database_mgr import DocumentManager, ChatHistoryManager
 from app.services.chat import ChatService
-from app.utils.auth import hash_password, verify_password, create_access_token, get_current_user
 from app.core.database import users_collection
+from app.core.dependencies import get_current_user, get_password_hash, verify_password, create_access_token
 
 router = APIRouter(prefix="/api/v1")
 
 upload_service = UploadService()
 chat_service = ChatService()
 
-# ── Auth Endpoints ───────────────────────────────────────────
+# ── Authentication Endpoints ─────────────────────────────────
 
-@router.post("/auth/register", response_model=Token)
-async def register(user_data: UserRegister):
-    # Check if email already exists
-    existing_user = await users_collection.find_one({"email": user_data.email})
+@router.post("/auth/signup")
+async def signup(user_data: UserRegister):
+    existing_user = await users_collection.find_one({"username": user_data.username})
     if existing_user:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Email already registered"
+            detail="Username already registered"
         )
     
-    hashed = hash_password(user_data.password)
-    user = {
-        "email": user_data.email,
-        "hashed_password": hashed
-    }
-    await users_collection.insert_one(user)
+    user_id = str(uuid.uuid4())
+    hashed_password = get_password_hash(user_data.password)
     
-    # Generate token
-    token = create_access_token({"sub": user_data.email})
-    return {"access_token": token, "token_type": "bearer"}
+    await users_collection.insert_one({
+        "user_id": user_id,
+        "username": user_data.username,
+        "password_hash": hashed_password
+    })
+    
+    return {
+        "success": True,
+        "message": "User created successfully"
+    }
 
 @router.post("/auth/login", response_model=Token)
-async def login(user_data: UserLogin):
-    user = await users_collection.find_one({"email": user_data.email})
-    if not user or not verify_password(user_data.password, user["hashed_password"]):
+async def login(credentials: UserLogin):
+    user = await users_collection.find_one({"username": credentials.username})
+    if not user:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Incorrect email or password",
-            headers={"WWW-Authenticate": "Bearer"},
+            detail="Invalid username or password"
         )
-        
-    token = create_access_token({"sub": user_data.email})
-    return {"access_token": token, "token_type": "bearer"}
+    
+    if not verify_password(credentials.password, user["password_hash"]):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid username or password"
+        )
+    
+    access_token = create_access_token(data={"username": user["username"], "user_id": user["user_id"]})
+    return {
+        "access_token": access_token,
+        "token_type": "bearer",
+        "username": user["username"]
+    }
 
-# ── Secured RAG Endpoints ─────────────────────────────────────
+@router.get("/auth/me")
+async def me(current_user: dict = Depends(get_current_user)):
+    return {
+        "username": current_user["username"],
+        "user_id": current_user["user_id"]
+    }
+
+# ── RAG Endpoints ─────────────────────────────────────────────
 
 @router.post("/documents/upload")
 async def upload_document(file: UploadFile = File(...), current_user: dict = Depends(get_current_user)):
-    return await upload_service.upload(file, user_id=current_user["_id"])
+    return await upload_service.upload(file, user_id=current_user["user_id"])
 
 @router.get("/documents")
 async def get_documents(current_user: dict = Depends(get_current_user)):
-    return await DocumentManager.get_all_documents(user_id=current_user["_id"])
+    return await DocumentManager.get_all_documents(user_id=current_user["user_id"])
 
 @router.delete("/documents/{document_id}")
 async def delete_document(document_id: str, current_user: dict = Depends(get_current_user)):
-    await DocumentManager.delete_document(document_id, user_id=current_user["_id"])
+    await DocumentManager.delete_document(document_id, user_id=current_user["user_id"])
     return {
         "success": True,
         "message": "Document deleted"
@@ -71,12 +90,12 @@ async def chat(request: ChatRequest, current_user: dict = Depends(get_current_us
         request.query,
         request.session_id,
         request.top_k,
-        user_id=current_user["_id"]
+        user_id=current_user["user_id"]
     )
 
 @router.get("/chat/history/{session_id}")
 async def get_chat_history(session_id: str, current_user: dict = Depends(get_current_user)):
-    history = await ChatHistoryManager.get_history(session_id, user_id=current_user["_id"])
+    history = await ChatHistoryManager.get_history(session_id, user_id=current_user["user_id"])
     return {
         "session_id": session_id,
         "messages": history
@@ -84,8 +103,9 @@ async def get_chat_history(session_id: str, current_user: dict = Depends(get_cur
 
 @router.delete("/chat/history/{session_id}")
 async def clear_chat_history(session_id: str, current_user: dict = Depends(get_current_user)):
-    await ChatHistoryManager.clear_history(session_id, user_id=current_user["_id"])
+    await ChatHistoryManager.clear_history(session_id, user_id=current_user["user_id"])
     return {
         "success": True,
         "message": "History cleared"
     }
+

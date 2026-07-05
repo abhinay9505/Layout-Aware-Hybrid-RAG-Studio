@@ -27,24 +27,18 @@ class ChatService:
         await ChatHistoryManager.save_chat(session_id, "user", query, user_id=user_id)
         await ChatHistoryManager.save_chat(session_id, "assistant", result["response"], user_id=user_id)
 
-        documents_used = []
-        for doc in result.get("retrieved_docs", []):
-            documents_used.append({
-                "file_name": doc.metadata.get("file_name"),
-                "chunk_id": doc.metadata.get("chunk_id")
+        sources = []
+        for item in result.get("search_results", []):
+            doc = item["document"]
+            sources.append({
+                "document_name": doc.metadata.get("file_name") or "unknown",
+                "page": doc.metadata.get("page_num"),
+                "chunk": doc.page_content
             })
 
-        rewritten = result.get("rewritten_query", query)
         response = {
-            "success": True,
-            "source": result["source"],
             "answer": result["response"],
-            "session_id": session_id,
-            "cached": False,
-            "relevance_score": result.get("relevance_score", 0.0),
-            "retrieved_chunks": len(result.get("retrieved_docs", [])),
-            "documents_used": documents_used,
-            "rewritten_query": rewritten if rewritten != query else None
+            "sources": sources
         }
 
         await RedisCacheService.set_cache(cache_key, json.dumps(response))

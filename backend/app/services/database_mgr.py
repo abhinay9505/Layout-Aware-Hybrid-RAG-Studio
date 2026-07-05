@@ -1,6 +1,6 @@
 import uuid
 from datetime import datetime
-from app.core.database import documents_collection, chat_history_collection
+from app.core.database import documents_collection, chat_history_collection, figures_collection
 from app.services.vector_store import LocalVectorStore
 
 class DocumentManager:
@@ -39,6 +39,24 @@ class DocumentManager:
         if res.deleted_count > 0:
             # Delete corresponding vectors
             await LocalVectorStore.delete_documents(document_id)
+            # Delete corresponding figures
+            await figures_collection.delete_many({"document_id": document_id})
+
+class FigureManager:
+    @staticmethod
+    async def save_figure(document_id, figure_number, caption, page_number, image_path, nearby_text, user_id=None):
+        import uuid
+        figure_id = str(uuid.uuid4())
+        await figures_collection.insert_one({
+            "figure_id": figure_id,
+            "document_id": document_id,
+            "user_id": user_id,
+            "figure_number": figure_number,
+            "caption": caption,
+            "page_number": page_number,
+            "image_path": image_path,
+            "nearby_text": nearby_text
+        })
 
 class ChatHistoryManager:
     @staticmethod

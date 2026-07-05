@@ -11,4 +11,6 @@ class GraphState(TypedDict):
     source: str
     relevance_score: float
     user_id: str
+    is_document_qa: bool
+
 

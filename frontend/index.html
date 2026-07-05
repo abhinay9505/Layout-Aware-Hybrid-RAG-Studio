@@ -3,205 +3,161 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Hybrid RAG Assistant</title>
-    <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' rx='20' fill='%236366f1'/><text y='72' x='50' text-anchor='middle' font-size='60'>🧠</text></svg>">
-    <meta name="description" content="AI-powered Hybrid RAG Assistant — search your documents or the web with intelligent fallback.">
-    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;700&family=Inter:wght@300;400;500;600&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="styles.css">
+    <title>RAG Studio - Layout-Aware Hybrid RAG Platform</title>
+    <meta name="description" content="A state-of-the-art layout-aware hybrid RAG application. Upload documents, extract complex tables and figures, and perform priority search retrieval.">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="style.css">
 </head>
 <body>
-    <div class="app-container" id="app-container" style="display: none;">
+    <!-- Auth Screen Modal Overlay -->
+    <div id="auth-overlay" class="auth-overlay">
+        <div class="auth-card">
+            <div class="auth-header">
+                <h2>🧠 RAG Studio</h2>
+                <p id="auth-subtitle">Login to your account to begin indexing and Q&A.</p>
+            </div>
+            <form id="auth-form" class="auth-form">
+                <div class="form-group">
+                    <label for="auth-username">Username</label>
+                    <input type="text" id="auth-username" required autocomplete="username" placeholder="Enter username">
+                </div>
+                <div class="form-group">
+                    <label for="auth-password">Password</label>
+                    <input type="password" id="auth-password" required autocomplete="current-password" placeholder="Enter password">
+                </div>
+                <button type="submit" id="auth-submit-btn" class="btn btn-primary">Login</button>
+            </form>
+            <div class="auth-toggle">
+                <span id="auth-toggle-text">Don't have an account?</span>
+                <button id="auth-toggle-btn">Sign Up</button>
+            </div>
+        </div>
+    </div>
 
+    <div class="app-container">
         <!-- Sidebar -->
         <aside class="sidebar">
             <div class="sidebar-header">
-                <div class="logo">
-                    <div class="logo-icon">
-                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5"/><path d="M2 12l10 5 10-5"/></svg>
+                <div class="logo-container">
+                    <svg class="logo-icon" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                        <path d="M12 2L2 7L12 12L22 7L12 2Z" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/>
+                        <path d="M2 17L12 22L22 17M2 12L12 17L22 12" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/>
+                    </svg>
+                    <h1>RAG Studio</h1>
+                </div>
+                <p class="sidebar-subtitle">Layout-Aware Hybrid RAG</p>
+            </div>
+
+            <!-- User profile status section -->
+            <div class="session-info" id="user-profile-section" style="display: none; margin-bottom: 12px;">
+                <span class="session-label">Logged In As</span>
+                <div class="session-id-container">
+                    <div class="user-profile-details">
+                        <span class="user-profile-name" id="user-profile-name">Username</span>
+                        <span class="user-profile-role">Active Account</span>
                     </div>
-                    <span>RAG Studio</span>
-                </div>
-                <div style="display: flex; gap: 0.4rem;">
-                    <button class="btn-icon" id="new-session-btn" title="New session">
-                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 5v14M5 12h14"/></svg>
-                    </button>
-                    <button class="btn-icon" id="logout-btn" title="Logout">
-                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
+                    <button id="logout-btn" title="Logout">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4M16 17l5-5-5-5M21 12H9"/></svg>
                     </button>
                 </div>
             </div>
 
-            <!-- User Profile Panel -->
-            <div class="user-panel" style="display:flex;align-items:center;gap:0.6rem;background:rgba(255,255,255,0.03);border:1px solid var(--border);border-radius:10px;padding:0.6rem 0.75rem;">
-                <div style="width:28px;height:28px;border-radius:50%;background:linear-gradient(135deg,var(--accent2),var(--accent));display:flex;align-items:center;justify-content:center;font-weight:600;font-size:0.8rem;text-transform:uppercase;color:#fff;" id="user-avatar">
-                    U
+            <div class="sidebar-section">
+                <h3>Session Details</h3>
+                <div class="session-info" id="new-chat-btn" style="cursor: pointer; user-select: none; margin-bottom: 8px;">
+                    <span class="session-label">Session Actions</span>
+                    <div style="display: flex; align-items: center; justify-content: space-between; gap: 8px;">
+                        <span style="font-size: 13px; font-weight: 600; color: var(--text-primary);">New Chat Session</span>
+                        <svg class="btn-icon" style="color: var(--accent-indigo);" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M5 12h14"/></svg>
+                    </div>
                 </div>
-                <div style="overflow:hidden;flex:1;">
-                    <div style="font-size:0.8rem;font-weight:500;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;" id="user-display-name">Gmail Address</div>
-                    <div style="font-size:0.68rem;color:var(--muted)">Active User</div>
+                <div class="session-info">
+                    <span class="session-label">Session ID</span>
+                    <div class="session-id-container">
+                        <span id="session-id-display">Generating...</span>
+                        <button id="copy-session-btn" title="Copy Session ID">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>
+                        </button>
+                    </div>
                 </div>
             </div>
 
-            <!-- Session Info -->
-            <div class="session-panel">
-                <div class="session-label">
-                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
-                    <span>Session ID</span>
-                </div>
-                <div class="session-id-box">
-                    <span id="session-id-display">—</span>
-                    <button class="btn-copy" id="copy-session-btn" title="Copy session ID">
-                        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+            <div class="sidebar-section">
+                <h3>Upload Document</h3>
+                <form id="upload-form" class="upload-area">
+                    <input type="file" id="file-input" accept=".pdf,.docx" style="display: none;">
+                    <label for="file-input" class="upload-label" id="upload-label-area">
+                        <svg class="upload-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M17 8l-5-5-5 5M12 3v12"/></svg>
+                        <span class="upload-text-main">Choose a file</span>
+                        <span class="upload-text-sub">PDF, DOCX</span>
+                    </label>
+                    <div id="file-selected-info" class="file-selected-info" style="display: none;">
+                        <span class="file-icon">📄</span>
+                        <span id="selected-file-name" class="file-name">filename.pdf</span>
+                    </div>
+                    <button type="submit" id="index-btn" class="btn btn-primary" disabled>
+                        Index File
                     </button>
+                </form>
+                <div id="upload-progress-container" class="progress-container" style="display: none;">
+                    <div class="progress-bar-wrapper">
+                        <div id="upload-progress-bar" class="progress-bar"></div>
+                    </div>
+                    <span id="upload-progress-status" class="progress-status">Uploading & Indexing...</span>
                 </div>
             </div>
 
-            <!-- Upload Section -->
-            <div class="section-label">Files &amp; Media</div>
-            <div class="upload-section" id="drop-zone">
-                <div class="upload-icon">
-                    <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
-                </div>
-                <p class="upload-title">Upload Files</p>
-                <p class="upload-sub">Docs, Audio, Video, Images</p>
-                <input type="file" id="file-input" accept=".pdf,.docx,.png,.jpg,.jpeg,.gif,.webp,.bmp,.mp3,.wav,.m4a,.ogg,.flac,.mp4,.avi,.mov,.mkv,.webm" hidden>
-            </div>
-
-            <!-- Upload Progress -->
-            <div class="upload-progress-container" id="upload-progress-container" hidden>
-                <div class="progress-label">
-                    <span id="upload-file-name">Uploading...</span>
-                    <span id="upload-status">Processing</span>
-                </div>
-                <div class="progress-bar-track">
-                    <div class="progress-bar-fill" id="progress-bar-fill"></div>
-                </div>
-            </div>
-
-            <!-- Documents List -->
-            <div class="documents-list" id="documents-list">
-                <div class="empty-docs">
-                    <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
-                    <p>No documents yet</p>
-                </div>
-            </div>
-
-            <!-- Stats -->
-            <div class="sidebar-stats">
-                <div class="stat-item">
-                    <span class="stat-value" id="doc-count">0</span>
-                    <span class="stat-label">Documents</span>
-                </div>
-                <div class="stat-divider"></div>
-                <div class="stat-item">
-                    <span class="stat-value" id="msg-count">0</span>
-                    <span class="stat-label">Messages</span>
+            <div class="sidebar-section flex-grow">
+                <h3>Indexed Documents</h3>
+                <div id="documents-list" class="documents-list">
+                    <!-- Dynamic Document Cards -->
+                    <div class="no-docs-message">No documents uploaded yet.</div>
                 </div>
             </div>
         </aside>
 
         <!-- Main Chat Area -->
-        <main class="chat-container">
+        <main class="chat-workspace">
             <header class="chat-header">
-                <div class="header-info">
-                    <div>
-                        <h1>Hybrid RAG Assistant</h1>
-                        <p class="header-sub">Document-aware AI with web fallback</p>
-                    </div>
-                    <span class="status-badge" id="status-badge">
-                        <span class="status-dot"></span>
-                        Online
-                    </span>
-                </div>
-                <div class="header-actions">
-                    <button class="btn-icon-text" id="clear-chat-btn" title="Clear session history">
-                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
-                        Clear
-                    </button>
+                <h2>Interactive QA Assistant</h2>
+                <div class="status-indicator">
+                    <span class="status-dot green"></span>
+                    <span id="status-text">Connected</span>
                 </div>
             </header>
 
-            <!-- Chat Messages -->
-            <div class="chat-history" id="chat-history">
-                <div class="welcome-screen">
-                    <div class="welcome-glow"></div>
-                    <div class="welcome-icon">
-                        <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5"/><path d="M2 12l10 5 10-5"/></svg>
-                    </div>
-                    <h2>Hybrid RAG Assistant</h2>
-                    <p>Upload a document to query your knowledge base, or ask any question and I'll search the web as a fallback.</p>
-                    <div class="feature-chips">
-                        <div class="chip">📄 Document Search</div>
-                        <div class="chip">🌐 Web Fallback</div>
-                        <div class="chip">⚡ Smart Cache</div>
-                        <div class="chip">💬 Session Memory</div>
+            <div id="chat-messages-container" class="chat-messages-container">
+                <!-- Messages will be dynamically rendered here -->
+                <div class="welcome-card">
+                    <svg class="welcome-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+                    <h3>Welcome to RAG Studio</h3>
+                    <p>Ingest dense two-column academic papers, retrieve details from visual diagrams, and compile accurate tables with layout-aware hybrid retrieval.</p>
+                    <div class="sample-questions">
+                        <button class="sample-question-btn">Compare BERTBASE and BERTLARGE architecture parameters</button>
+                        <button class="sample-question-btn">How much improvement did BERT achieve on GLUE compared with OpenAI GPT?</button>
+                        <button class="sample-question-btn">Explain Figure 1 BERT pre-training and fine tuning</button>
+                        <button class="sample-question-btn">Explain Figure 2 input representation</button>
                     </div>
                 </div>
             </div>
 
-            <!-- Input Area -->
-            <div class="chat-input-wrapper">
-                <div class="chat-input-container" id="input-container">
-                    <textarea id="chat-input" placeholder="Ask anything — I'll search your docs or the web..." rows="1" aria-label="Chat input"></textarea>
-                    <div class="input-actions">
-                        <span class="char-count" id="char-count">0 / 4000</span>
-                        <button id="send-btn" class="btn-send" aria-label="Send message">
-                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
-                        </button>
-                    </div>
-                </div>
-                <p class="input-hint">Press <kbd>Enter</kbd> to send · <kbd>Shift+Enter</kbd> for new line</p>
+            <div class="chat-input-area">
+                <form id="chat-form" class="chat-form-container">
+                    <input type="text" id="chat-input" placeholder="Ask a question about the document..." required autocomplete="off">
+                    <button type="submit" id="send-btn" class="btn btn-icon-only">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="22" y1="2" x2="11" y2="13"></line><polygon points="22 2 15 22 11 13 2 9 22 2"></polygon></svg>
+                    </button>
+                </form>
             </div>
         </main>
     </div>
 
     <!-- Notification Toast -->
-    <div id="toast" class="toast hidden" role="alert"></div>
+    <div id="toast" class="toast"></div>
 
-    <!-- Confirm Modal -->
-    <div class="modal-overlay" id="modal-overlay" hidden>
-        <div class="modal">
-            <h3 id="modal-title">Confirm</h3>
-            <p id="modal-message">Are you sure?</p>
-            <div class="modal-actions">
-                <button class="btn-modal-cancel" id="modal-cancel">Cancel</button>
-                <button class="btn-modal-confirm" id="modal-confirm">Confirm</button>
-            </div>
-        </div>
-    </div>
-
-    <!-- Authentication Card Overlay -->
-    <div class="auth-container" id="auth-container">
-        <div class="auth-card">
-            <div class="auth-glow"></div>
-            <div class="auth-header">
-                <div class="logo">
-                    <div class="logo-icon">
-                        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5"/><path d="M2 12l10 5 10-5"/></svg>
-                    </div>
-                    <span>RAG Studio</span>
-                </div>
-                <h2 id="auth-title">Welcome Back</h2>
-                <p id="auth-subtitle">Login to access your Hybrid RAG Assistant</p>
-            </div>
-            <form id="auth-form">
-                <div class="input-group">
-                    <label for="auth-username">Gmail Address</label>
-                    <input type="email" id="auth-username" required placeholder="example@gmail.com" autocomplete="email">
-                </div>
-                <div class="input-group">
-                    <label for="auth-password">Password</label>
-                    <input type="password" id="auth-password" required placeholder="Enter password" autocomplete="current-password">
-                </div>
-                <button type="submit" class="btn-auth" id="btn-auth-submit">Login</button>
-            </form>
-            <div class="auth-switch">
-                <span id="auth-switch-text">Don't have an account?</span>
-                <button id="auth-switch-btn">Sign Up</button>
-            </div>
-        </div>
-    </div>
-
-    <script src="script.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+    <script src="app.js"></script>
 </body>
 </html>
