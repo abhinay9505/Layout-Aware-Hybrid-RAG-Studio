@@ -5,7 +5,7 @@ from app.api.routes import router
 from app.core.database import redis_client, mongo_client
 
 app = FastAPI(
-    title="Production Hybrid RAG Backend",
+    title="Layout-Aware  RAG Backend",
     version="1.0.0"
 )
 

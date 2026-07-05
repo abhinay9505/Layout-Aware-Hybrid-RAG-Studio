@@ -1,6 +1,6 @@
 # 🧠 Hybrid RAG Backend
 
-Production-grade **Agentic Hybrid RAG** backend built with **FastAPI**, **LangGraph**, **Qdrant**, **MongoDB**, and **Redis**. It intelligently routes queries between your uploaded documents and the web, providing source-labeled, session-aware responses.
+Production-grade **Agentic Hybrid RAG** backend built with **FastAPI**, **LangGraph**, **FAISS**, **MongoDB/SQLite**, and **Redis/In-Memory Cache**. It intelligently routes queries between your uploaded documents and the web, providing source-labeled, session-aware responses.
 
 ---
 
@@ -13,16 +13,16 @@ backend/
 │   ├── __init__.py
 │   │
 │   ├── api/
-│   │   └── routes.py           # REST endpoints (chat, documents, history)
+│   │   └── routes.py           # REST endpoints with OpenAPI tags (chat, documents, history)
 │   │
 │   ├── core/
 │   │   ├── config.py           # Environment variables & logging setup
-│   │   ├── database.py         # Async MongoDB (motor) & Redis clients
+│   │   ├── database.py         # Dual-mode SQLite/MongoDB & Redis/In-Memory clients
 │   │   └── dependencies.py     # Shared dependency injection
 │   │
 │   ├── graph/
 │   │   ├── state.py            # LangGraph state schema
-│   │   ├── nodes.py            # Graph nodes (retrieve, generate, web search)
+│   │   ├── nodes.py            # Graph nodes (restored hybrid search, query expansion, generation)
 │   │   ├── edges.py            # Conditional routing logic
 │   │   └── builder.py          # LangGraph workflow builder
 │   │
@@ -31,10 +31,10 @@ backend/
 │   │
 │   ├── services/
 │   │   ├── ingestion.py        # Document chunking & embedding pipeline
-│   │   ├── vector_store.py     # Qdrant vector store operations
-│   │   ├── cache.py            # Redis semantic caching
+│   │   ├── vector_store.py     # Local FAISS vector store operations
+│   │   ├── cache.py            # Dual-mode Redis/Local semantic caching
 │   │   ├── chat.py             # Session-aware chat service
-│   │   ├── database_mgr.py     # MongoDB document metadata manager
+│   │   ├── database_mgr.py     # Document metadata manager
 │   │   └── web_chain.py        # DuckDuckGo web search fallback chain
 │   │
 │   └── utils/
@@ -46,14 +46,17 @@ backend/
 
 ---
 
-## ⚙️ Prerequisites
+## ⚙️ Prerequisites & Database Modes
 
-| Dependency | Version  | Purpose                        |
-|------------|----------|--------------------------------|
-| Python     | ≥ 3.10   | Runtime                        |
-| MongoDB    | ≥ 6.0    | Chat history & document metadata |
-| Redis      | ≥ 7.0    | Semantic caching               |
-| Groq API   | —        | LLM inference (Llama / Mixtral) |
+The backend runs in **Dual-Mode** to enable zero-configuration local runs while remaining ready for production MongoDB and Redis:
+
+| Dependency | Required | Fallback Option | Purpose |
+|---|---|---|---|
+| **Python** | Yes (≥ 3.10) | — | Runtime |
+| **MongoDB** | Optional | **SQLite** (`hybrid_rag.db`) | Chat history & document metadata |
+| **Redis** | Optional | **Local Memory Cache** | Semantic caching |
+| **FAISS** | Yes (Local) | — | Vector similarity search index |
+| **Groq API** | Yes | — | LLM inference (Llama / Mixtral) |
 
 ---
 
@@ -79,7 +82,7 @@ pip install -r requirements.txt
 
 ### 3. Configure environment variables
 
-Create a `.env` file in the **project root** (`RAG/.env`):
+Create a `.env` file in the **project root** or **backend/app/.env**:
 
 ```env
 GROQ_API_KEY=your_groq_api_key_here
@@ -89,17 +92,7 @@ MONGO_DB=hybrid_rag
 EMBEDDING_MODEL_NAME=sentence-transformers/all-MiniLM-L6-v2
 ```
 
-### 4. Start infrastructure services
-
-```bash
-# Start MongoDB
-mongod --dbpath /data/db
-
-# Start Redis
-redis-server
-```
-
-### 5. Run the server
+### 4. Run the server
 
 ```bash
 uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
@@ -111,40 +104,22 @@ The API will be available at **`http://localhost:8000`**.
 
 ## 📡 API Endpoints
 
-| Method   | Endpoint                        | Description                       |
-|----------|---------------------------------|-----------------------------------|
-| `GET`    | `/health`                       | Health check (Redis, Mongo, LLM)  |
-| `POST`   | `/api/v1/documents/upload`      | Upload a PDF or DOCX document     |
-| `GET`    | `/api/v1/documents`             | List all ingested documents       |
-| `DELETE` | `/api/v1/documents/{doc_id}`    | Delete a document and its chunks  |
-| `POST`   | `/api/v1/chat`                  | Send a query (returns sourced answer) |
-| `GET`    | `/api/v1/chat/history/{session_id}` | Retrieve session chat history |
-| `DELETE` | `/api/v1/chat/history/{session_id}` | Clear session chat history    |
+All REST routes are tagged for clean OpenAPI documentation.
 
-### Example Chat Request
+### Authentication (`tags=["Authentication"]`)
+* `POST` `/api/v1/auth/signup` — Register a new user
+* `POST` `/api/v1/auth/login` — Authenticate and retrieve JWT token
+* `GET` `/api/v1/auth/me` — Retrieve active user context
 
-```bash
-curl -X POST http://localhost:8000/api/v1/chat \
-  -H "Content-Type: application/json" \
-  -d '{
-    "query": "What is retrieval augmented generation?",
-    "session_id": "your-session-uuid",
-    "top_k": 5
-  }'
-```
+### Documents (`tags=["Documents"]`)
+* `POST` `/api/v1/documents/upload` — Upload a PDF or DOCX document
+* `GET` `/api/v1/documents` — List metadata of uploaded documents
+* `DELETE` `/api/v1/documents/{doc_id}` — Delete document chunks and metadata
 
-### Example Response
-
-```json
-{
-  "success": true,
-  "answer": "Retrieval-Augmented Generation (RAG) is...",
-  "source": "document",
-  "cached": false,
-  "retrieved_chunks": 5,
-  "relevance_score": 0.87
-}
-```
+### Chat & History (`tags=["Chat"]`)
+* `POST` `/api/v1/chat` — Query RAG pipeline (returns source-labeled response)
+* `GET` `/api/v1/chat/history/{session_id}` — Retrieve chat session messages
+* `DELETE` `/api/v1/chat/history/{session_id}` — Clear chat session history
 
 ---
 
@@ -155,43 +130,27 @@ User Query
     │
     ▼
 ┌──────────────┐     ┌──────────────────┐
-│  Redis Cache  │────▶│  Return Cached   │
-│  (hit?)       │     │  Response        │
+│  Redis/Local │────▶│  Return Cached   │
+│  Cache Hit?  │     │  Return Cached   │
+│  (Semantic)  │     │  Response        │
 └──────┬───────┘     └──────────────────┘
        │ miss
        ▼
-┌──────────────┐
-│  LangGraph   │
-│  Router      │
-└──────┬───────┘
-       │
-  ┌────┴────┐
-  ▼         ▼
-┌─────┐  ┌──────┐
-│ Doc │  │ Web  │
-│ RAG │  │Search│
-└──┬──┘  └──┬───┘
-   │        │
-   ▼        ▼
-┌──────────────┐
-│  LLM (Groq)  │
-│  Generation   │
-└──────┬───────┘
-       │
-       ▼
-  Cache + Return
+┌──────────────────────────────────────┐
+│        LangGraph RAG Pipeline        │
+│ 1. Normalize/Expand Query            │
+│ 2. Hybrid Retrieve (BM25 + Vector)   │
+│ 3. Specific Chunks Priority Injection│
+│ 4. Reciprocal Rank Fusion & Rerank   │
+└──────────────────┬───────────────────┘
+                   │
+                   ▼
+┌──────────────────────────────────────┐
+│         LLM (Groq) Generator         │
+│  - Formats tables if comparison      │
+│  - Strict no-evidence checks         │
+└──────────────────┬───────────────────┘
+                   │
+                   ▼
+            Cache + Return
 ```
-
----
-
-## 🛠️ Tech Stack
-
-- **FastAPI** — Async REST API framework
-- **LangGraph** — Agentic workflow orchestration
-- **LangChain** — Document processing & LLM chains
-- **Groq** — Ultra-fast LLM inference
-- **MongoDB (Motor)** — Async document/metadata storage
-- **Redis** — Semantic response caching
-- **Qdrant** — Vector similarity search
-- **Sentence Transformers** — Embedding model (`all-MiniLM-L6-v2`)
-- **DuckDuckGo Search** — Web fallback when no documents match

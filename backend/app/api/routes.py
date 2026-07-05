@@ -14,7 +14,7 @@ chat_service = ChatService()
 
 # ── Authentication Endpoints ─────────────────────────────────
 
-@router.post("/auth/signup")
+@router.post("/auth/signup", tags=["Authentication"])
 async def signup(user_data: UserRegister):
     existing_user = await users_collection.find_one({"username": user_data.username})
     if existing_user:
@@ -37,7 +37,7 @@ async def signup(user_data: UserRegister):
         "message": "User created successfully"
     }
 
-@router.post("/auth/login", response_model=Token)
+@router.post("/auth/login", response_model=Token, tags=["Authentication"])
 async def login(credentials: UserLogin):
     user = await users_collection.find_one({"username": credentials.username})
     if not user:
@@ -59,7 +59,7 @@ async def login(credentials: UserLogin):
         "username": user["username"]
     }
 
-@router.get("/auth/me")
+@router.get("/auth/me", tags=["Authentication"])
 async def me(current_user: dict = Depends(get_current_user)):
     return {
         "username": current_user["username"],
@@ -68,15 +68,15 @@ async def me(current_user: dict = Depends(get_current_user)):
 
 # ── RAG Endpoints ─────────────────────────────────────────────
 
-@router.post("/documents/upload")
+@router.post("/documents/upload", tags=["Documents"])
 async def upload_document(file: UploadFile = File(...), current_user: dict = Depends(get_current_user)):
     return await upload_service.upload(file, user_id=current_user["user_id"])
 
-@router.get("/documents")
+@router.get("/documents", tags=["Documents"])
 async def get_documents(current_user: dict = Depends(get_current_user)):
     return await DocumentManager.get_all_documents(user_id=current_user["user_id"])
 
-@router.delete("/documents/{document_id}")
+@router.delete("/documents/{document_id}", tags=["Documents"])
 async def delete_document(document_id: str, current_user: dict = Depends(get_current_user)):
     await DocumentManager.delete_document(document_id, user_id=current_user["user_id"])
     return {
@@ -84,7 +84,7 @@ async def delete_document(document_id: str, current_user: dict = Depends(get_cur
         "message": "Document deleted"
     }
 
-@router.post("/chat", response_model=ChatResponse)
+@router.post("/chat", response_model=ChatResponse, tags=["Chat"])
 async def chat(request: ChatRequest, current_user: dict = Depends(get_current_user)):
     return await chat_service.chat(
         request.query,
@@ -93,7 +93,7 @@ async def chat(request: ChatRequest, current_user: dict = Depends(get_current_us
         user_id=current_user["user_id"]
     )
 
-@router.get("/chat/history/{session_id}")
+@router.get("/chat/history/{session_id}", tags=["Chat"])
 async def get_chat_history(session_id: str, current_user: dict = Depends(get_current_user)):
     history = await ChatHistoryManager.get_history(session_id, user_id=current_user["user_id"])
     return {
@@ -101,11 +101,10 @@ async def get_chat_history(session_id: str, current_user: dict = Depends(get_cur
         "messages": history
     }
 
-@router.delete("/chat/history/{session_id}")
+@router.delete("/chat/history/{session_id}", tags=["Chat"])
 async def clear_chat_history(session_id: str, current_user: dict = Depends(get_current_user)):
     await ChatHistoryManager.clear_history(session_id, user_id=current_user["user_id"])
     return {
         "success": True,
         "message": "History cleared"
     }
-
